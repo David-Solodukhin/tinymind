@@ -3,7 +3,6 @@ package com.dookin;
 import com.badlogic.gdx.Application;
 import com.badlogic.gdx.ApplicationAdapter;
 import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Color;
 import com.badlogic.gdx.graphics.GL20;
 import com.badlogic.gdx.graphics.OrthographicCamera;
@@ -14,10 +13,8 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
-import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.Joint;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
-import com.badlogic.gdx.physics.box2d.QueryCallback;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.physics.box2d.joints.MouseJoint;
 import com.badlogic.gdx.physics.box2d.joints.MouseJointDef;
@@ -50,7 +47,7 @@ public class MindGame extends ApplicationAdapter {
 	public void create () {
 		System.out.println(Gdx.graphics.getWidth() + " " + Gdx.graphics.getHeight());
 		batch = new SpriteBatch();
-		//img = new Texture("badlogic.jpg");
+		img = new Texture("bg.jpg");
 		camera = new OrthographicCamera();
 		camera.setToOrtho(false,Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
 
@@ -66,79 +63,24 @@ public class MindGame extends ApplicationAdapter {
 		myLight = new PointLight(rayHandler, 400, Color.WHITE, 300/Utils.PPM, 40.0f/32.0f, 40.0f/32.0f);
 		myLight.setSoftnessLength(0.0f);
 		//rayHandler.setCombinedMatrix(camera.combined.scl(Utils.PPM));
-		mousejd = new MouseJointDef();
 
+
+		cameraUpdate();
+		//since camera always follows player, we're drawing the thing on top of the player since player is always in the center of camera
+		testAsteroid = new Asteroid(stob2d(new Vector3(20, 20, 0)), world, 1,5, null);
+
+		createPlayer(-6,-6);
+
+
+		//mousejoint
+		mousejd = new MouseJointDef();
 		mousejd.bodyA = world.createBody(new BodyDef()); //not actually used
 		mousejd.bodyB = player; //one that is actually moving around
 		mousejd.collideConnected = true;
 		mousejd.maxForce = 100;
-		cameraUpdate();
-		//since camera always follows player, we're drawing the thing on top of the player since player is always in the center of camera
-		testAsteroid = new Asteroid(stob2d(new Vector3(20, 20, 0)), world, 2,5, null);
-
-		createPlayer(-6,-6);
-
+		//SETUP PROCESSORS AND LISTENERS//
 		world.setContactListener(new CollisionListener(world));
-		Gdx.input.setInputProcessor(new InputProcessor() {
-			@Override
-			public boolean keyDown(int keycode) {
-				return false;
-			}
-
-			@Override
-			public boolean keyUp(int keycode) {
-				return false;
-			}
-
-			@Override
-			public boolean keyTyped(char character) {
-				return false;
-			}
-
-			@Override
-			public boolean touchDown(int screenX, int screenY, int pointer, int button) {
-				camera.unproject(tmp.set(screenX, screenY, 0));
-				//System.out.println("world space coords: " + test.x/32.0f + " " + test.y/32.0f);
-				//tmp contains world coords and so does currentouched
-				tmp.set(Utils.p2m(tmp.x), Utils.p2m(tmp.y), 0);
-				world.QueryAABB(queryCallback, tmp.x, tmp.y, tmp.x, tmp.y);
-
-				return true;
-			}
-
-			@Override
-			public boolean touchUp(int screenX, int screenY, int pointer, int button) {
-				if (mousej == null) {
-					return false;
-				}
-				world.destroyJoint(mousej);
-				mousej = null;
-				return true;
-			}
-
-			@Override
-			public boolean touchDragged(int screenX, int screenY, int pointer) {
-				if (mousej == null) {
-					return false;
-				}
-				camera.unproject(tmp.set(screenX, screenY, 0));
-				tmp.set(Utils.p2m(tmp.x), Utils.p2m(tmp.y),0);
-				tmp2.set(tmp.x, tmp.y);
-				mousej.setTarget(tmp2);
-				//System.out.println("move to here drag: "+ Utils.p2m(currentTouched.x)+" "+ Utils.p2m(currentTouched.y));
-				return true;
-			}
-
-			@Override
-			public boolean mouseMoved(int screenX, int screenY) {
-				return false;
-			}
-
-			@Override
-			public boolean scrolled(int amount) {
-				return false;
-			}
-		});
+		Gdx.input.setInputProcessor(new GestureListener(world, mousej, mousejd, camera));
 
 
 
@@ -152,14 +94,17 @@ public class MindGame extends ApplicationAdapter {
 		Gdx.gl.glClearColor(0, 0, 0, 1);
 		Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT);
 
-		b2dr.render(world, camera.combined.scl(Utils.PPM));
-		rayHandler.render();
-		//System.out.println(Gdx.graphics.getFramesPerSecond());
-		/*
+		batch.setProjectionMatrix(camera.combined); //why does setting the projection matrix draw the spritebatch in world coords?
+		//batch.setTransformMatrix(camera.combined);
 		batch.begin();
 		batch.draw(img, 0, 0);
 		batch.end();
-		*/
+
+
+		b2dr.render(world, camera.combined.scl(Utils.PPM));
+		rayHandler.render();
+		//System.out.println(Gdx.graphics.getFramesPerSecond());
+
 	}
 
 	@Override
@@ -213,25 +158,7 @@ public class MindGame extends ApplicationAdapter {
 
 	}
 
-	private QueryCallback queryCallback = new QueryCallback() {
-		@Override
-		public boolean reportFixture(Fixture fixture) {
-			camera.unproject(tmp.set(Gdx.input.getX(), Gdx.input.getY(), 0));
-			tmp.set(Utils.p2m(tmp.x), Utils.p2m(tmp.y), 0);
 
-
-
-			if (!fixture.testPoint(tmp.x, tmp.y)) {
-				return true; //if this is not the fixture we touched, get the next one
-			}
-			mousejd.bodyB = fixture.getBody();
-
-			mousejd.target.set(tmp.x, tmp.y);
-			mousej = (MouseJoint)world.createJoint(mousejd);
-
-			return true;
-		}
-	};
 	private void updateInput() {
 
 		if(Gdx.input.isTouched()) {

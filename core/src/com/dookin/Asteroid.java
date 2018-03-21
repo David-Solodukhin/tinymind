@@ -2,7 +2,6 @@ package com.dookin;
 
 import com.badlogic.gdx.math.EarClippingTriangulator;
 import com.badlogic.gdx.math.MathUtils;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
@@ -60,7 +59,7 @@ public class Asteroid {
                 break;
             }
             case RAND1: {
-
+                generateRand1();
                 break;
             }
             case PRESET1: {
@@ -109,6 +108,43 @@ public class Asteroid {
         //world.destroyJoint(z);
     }
 
+    private void generateRand1() {
+
+        float[] vertices = randConvexCircle(0.2f * 10, -1f, 14, 2f, true);
+        Array<Body> bA = selfTriangulate(vertices); //creates bodies as well.
+
+
+        //thread the bodies together
+        WeldJointDef jdef = new WeldJointDef();
+        for (int i = 1; i < bA.size; i++) {
+
+
+            jdef.bodyA = bA.get(i - 1);
+            jdef.bodyB = bA.get(i);
+            jdef.collideConnected = false;
+            jdef.localAnchorA.set(0.0f, 0); //???? figure this out it somehow works tho lmao
+            jdef.localAnchorB.set(0.0f, 0);
+            WeldJoint tmp = (WeldJoint) world.createJoint(jdef);
+            joints.add(tmp);
+        }
+    }
+    public Array<Body> selfTriangulate(float[] vertices) {
+        Array<Body> result = new Array<Body>();
+        PolygonShape poly = new PolygonShape();
+        float[] tmp = new float[6];
+        for (int i = 0; i <= vertices.length - 6; i+=6) {
+            tmp[0] = vertices[i];
+            tmp[1] = vertices[i+1];
+            tmp[2] = vertices[i+2];
+            tmp[3] = vertices[i+3];
+            tmp[4] = vertices[i+4];
+            tmp[5] = vertices[i+5];
+            poly.set(tmp);
+            result.add(createFromShape(poly));
+        }
+        poly.dispose();
+        return result;
+    }
     public Body createFromShape(Shape s) {
         Body pBody;
 
@@ -122,68 +158,7 @@ public class Asteroid {
         return pBody;
     }
 
-    public Body createFragment1() {
-        Body pBody;
 
-        //STEP 1, BODY DEFINITION: position, friction, misc properties
-        BodyDef def = new BodyDef(); //body definition, describes physical properties body will have.
-        //friction, type of body, etc
-        def.type = BodyDef.BodyType.DynamicBody;
-
-        def.position.set(pos.x, pos.y); //b2d world coords in meters
-        //def.fixedRotation = true; //no rotations
-        pBody = world.createBody(def);//actually create body.
-        //STEP 2, CREATE SHAPE
-        PolygonShape shape = new PolygonShape();
-        //box 2d works in meters. pixels per meter is important
-
-        Vector2[] coords = new Vector2[3]; //for simplicity and consistency, all defined shapes will have root vertex/ based from 0,0 so that scaling of vectors is from this point
-        coords[0] = new Vector2(0 * scale, 0 * scale);
-        coords[1] = new Vector2(.2f * scale, -.2f * scale);
-        coords[2] = new Vector2(.4f * scale, -.1f * scale);
-        shape.set(coords); //specific in counter clockwise order and must describe a convex polygon
-        //STEP 3 ASSIGN FIXTURE TO BODY
-        pBody.createFixture(shape, 3.0f); //the fixture is attached to the shape and gives it a density
-        //cleanup
-        shape.dispose();
-        return pBody;
-    }
-
-    public Body createFragment2() {
-        Body pBody;
-
-        //STEP 1, BODY DEFINITION: position, friction, misc properties
-        BodyDef def = new BodyDef(); //body definition, describes physical properties body will have.
-        //friction, type of body, etc
-        def.type = BodyDef.BodyType.DynamicBody;
-
-        def.position.set(pos.x, pos.y); //b2d world coords
-        //def.fixedRotation = true; //no rotations
-        pBody = world.createBody(def);//actually create body.
-        //STEP 2, CREATE SHAPE
-        PolygonShape shape = new PolygonShape();
-        //box 2d works in meters. pixels per meter is important
-        //shape.setAsBox(Utils.p2m(32.0f/2.0f), Utils.p2m(32.0f/2.0f)); //box2d takes height and width from center. so actual width is 16 * 2 = 32
-        Vector2[] coords = new Vector2[3];
-        coords[0] = new Vector2(0 * scale, 0 * scale);
-        coords[1] = new Vector2(.4f * scale, -.1f * scale);
-        coords[2] = new Vector2(.5f * scale, .1f * scale);
-        shape.set(coords); //specific in counter clockwise order and must describe a convex polygon
-        //STEP 3 ASSIGN FIXTURE TO BODY
-        pBody.createFixture(shape, 3.0f); //the fixture is attached to the shape and gives it a density
-        //cleanup
-        shape.dispose();
-        return pBody;
-    }
-
-    public void separate() {
-        if (!fragmented) {
-            MindGame.destroyedJoints.add(z);
-            fragmented = true;
-        }
-
-
-    }
 
     //breaks off one body
     public void separateChunk(Body base) {
@@ -359,7 +334,7 @@ multiple unwelded bodies may touch at the same point, they collide which breaks 
 
 
             tst.add(x0 + r * MathUtils.cos(angle));
-            tst.add(x0 + r * MathUtils.sin(angle));
+            tst.add(y0 + r * MathUtils.sin(angle));
 
         }
         float[] tmp = new float[tst.size];
@@ -369,4 +344,47 @@ multiple unwelded bodies may touch at the same point, they collide which breaks 
 
         return tmp;
     }
+
+    public float[] randConvexCircle(float r, float a, int num, float scale, boolean neat) {
+        Array<Float> tst = new Array<Float>();
+        float x0 = 0, y0 = 0;
+        float angle = 0;
+        int i = 0;
+        int safe = 1;
+        for (i = 0; i < num; i++) {
+            angle += 0.5f + Math.random() * 0.3;
+            if (angle > 6.2831855f) {
+                break;
+            }
+            if (!neat) {
+                r = 0.1f + (float)Math.random() * scale;
+            }
+
+            float x = x0 + r * MathUtils.cos(angle);
+            float y = y0 + r * MathUtils.sin(angle);
+            tst.add(x);
+            tst.add(y);
+            safe ++;
+            if (safe == 3) {
+                tst.add(x0);
+                tst.add(y0);
+                tst.add(x);
+                tst.add(y);
+                safe = 2;
+            }
+
+        }
+        tst.add(tst.get(0));
+        tst.add(tst.get(1));
+        tst.add(x0);
+        tst.add(y0);
+
+        float[] tmp = new float[tst.size];
+        for (i = 0; i < tst.size; i++) {
+            tmp[i] = tst.get(i);
+        }
+
+        return tmp;
+    }
+
 }
