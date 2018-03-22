@@ -40,12 +40,12 @@ public class CollisionListener implements ContactListener {
         }//if only 1 bod is asteroid
         else if (ba.getUserData() instanceof Asteroid) {
             //((Asteroid) ba.getUserData()).separate();
-            System.out.println("shit collidedp1");
+           // System.out.println("shit collidedp1");
             ((Asteroid) ba.getUserData()).separateChunk(ba);
         }
         else if (bb.getUserData() instanceof Asteroid) {
             //((Asteroid) bb.getUserData()).separate();
-            System.out.println("shit collidedp2");
+            //System.out.println("shit collidedp2");
             ((Asteroid) bb.getUserData()).separateChunk(bb);
         }
 

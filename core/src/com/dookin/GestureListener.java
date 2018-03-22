@@ -1,10 +1,13 @@
 package com.dookin;
 
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.InputProcessor;
 import com.badlogic.gdx.graphics.Camera;
+import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.math.Vector3;
+import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.QueryCallback;
 import com.badlogic.gdx.physics.box2d.World;
@@ -23,17 +26,39 @@ public class GestureListener implements InputProcessor {
     private Vector3 tmp = new Vector3();
     private Vector2 tmp2 = new Vector2();
     private MouseJointDef mousejd;
+    private Body player;
 
 
-    public GestureListener(World world, MouseJoint mousej, MouseJointDef mousejd, Camera camera) {
+    public GestureListener(World world, MouseJoint mousej, MouseJointDef mousejd, Camera camera, Body player) {
         this.world = world;
         this.mousej = mousej;
         this.mousejd = mousejd;
         this.camera = camera;
+        this.player = player;
     }
 
     @Override
     public boolean keyDown(int keycode) {
+        if (keycode == Input.Keys.W) {
+
+            //impulse of 100 in direction of motion
+            player.applyLinearImpulse(new Vector2(10 * MathUtils.cos(player.getAngle()),  10 * MathUtils.sin(player.getAngle())), player.getWorldCenter(), true);
+        }
+        if (keycode == Input.Keys.S) {
+
+
+            player.applyLinearImpulse(new Vector2(-10 * MathUtils.cos(player.getAngle()),  -10 * MathUtils.sin(player.getAngle())), player.getWorldCenter(), true);
+        }
+        if (keycode == Input.Keys.A) {
+
+            player.applyTorque(10, true);
+            //player.applyLinearImpulse(new Vector2(-10 * MathUtils.cos(player.getAngle()),  -10 * MathUtils.sin(player.getAngle())), player.getWorldCenter(), true);
+        }
+        if (keycode == Input.Keys.D) {
+            player.applyTorque(-10, true);
+            //player.applyLinearImpulse(new Vector2(10 * MathUtils.cos(player.getAngle()),  10 * MathUtils.sin(player.getAngle())), player.getWorldCenter(), true);
+        }
+
         return false;
     }
 
