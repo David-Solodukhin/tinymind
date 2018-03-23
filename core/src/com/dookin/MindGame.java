@@ -16,8 +16,11 @@ import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.box2d.Body;
 import com.badlogic.gdx.physics.box2d.BodyDef;
 import com.badlogic.gdx.physics.box2d.Box2DDebugRenderer;
+import com.badlogic.gdx.physics.box2d.CircleShape;
+import com.badlogic.gdx.physics.box2d.Fixture;
 import com.badlogic.gdx.physics.box2d.Joint;
 import com.badlogic.gdx.physics.box2d.PolygonShape;
+import com.badlogic.gdx.physics.box2d.QueryCallback;
 import com.badlogic.gdx.physics.box2d.World;
 import com.badlogic.gdx.physics.box2d.joints.MouseJoint;
 import com.badlogic.gdx.physics.box2d.joints.MouseJointDef;
@@ -45,13 +48,17 @@ public class MindGame extends ApplicationAdapter {
 	public Asteroid testAsteroid;
 	private float srcX = 0;
 	private Sprite playerSprite;
+	private Sprite planetSprite;
+	private Body planet;
 	private Matrix4 cmAdjusted = new Matrix4();
+	private PointLight planetLight;
 
 	@Override
 	public void create () {
 		batch = new SpriteBatch();
 		img = new Texture("bg3.jpg");
 		playerSprite = new Sprite(new Texture("ship.png"));
+		planetSprite = new Sprite(new Texture("planet.png"));
 		img.setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
 		camera = new OrthographicCamera();
 		camera.setToOrtho(false,Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
@@ -60,17 +67,21 @@ public class MindGame extends ApplicationAdapter {
 		gravity = new Vector2(0,0);
 		world = new World(gravity, false);
 		b2dr = new Box2DDebugRenderer();
-		player = createPlayer(0,0);
+		player = createPlayer(-4,-4);
 		//platform  = createPlatform();
-
+		planet = createPlanet();
 		rayHandler = new RayHandler(world);
 		rayHandler.setAmbientLight(.4f);
 		myLight = new PointLight(rayHandler, 100, Color.CYAN, 300/Utils.PPM, 0, 0);
+		planetLight = new PointLight(rayHandler, 100, Color.GRAY, ((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius() * 1.5f, planet.getPosition().x, planet.getPosition().y);
+		planetLight.setXray(true);
+		//planetLight.setSoft(true);
+		//planetLight.setSoftnessLength(90.0f);
 		myLight.setSoftnessLength(0.0f);
 		//myLight.setXray(true);
 		//rayHandler.setCombinedMatrix(camera.combined.scl(Utils.PPM));
 		myLight.attachToBody(player);
-
+		//b2dr.setDrawBodies(false);
 		cameraUpdate();
 		//since camera always follows player, we're drawing the thing on top of the player since player is always in the center of camera
 		testAsteroid = new Asteroid(stob2d(new Vector3(20, 20, 0)), world, 1,5, null);
@@ -92,6 +103,29 @@ public class MindGame extends ApplicationAdapter {
 
 
 		//myLight.attachToBody(player);
+	}
+
+	private Body createPlanet() {
+		Body pBody;
+
+
+		BodyDef def = new BodyDef();
+		def.type = BodyDef.BodyType.StaticBody;
+		//def.angle = 90 * MathUtils.degRad;
+		def.position.set(0,0);
+		pBody = world.createBody(def);
+
+		//PolygonShape shape = new PolygonShape();
+		CircleShape shape = new CircleShape();
+		shape.setRadius(10f);
+		pBody.createFixture(shape, 3.0f);
+		pBody.getFixtureList().get(0).setFriction(0.8f);
+
+
+		//cleanup
+		shape.dispose();
+		return pBody;
+
 	}
 
 	@Override
@@ -126,6 +160,9 @@ public class MindGame extends ApplicationAdapter {
 		playerSprite.setScale(.5f);
 		playerSprite.setCenter(Utils.m2p(player.getPosition().x), Utils.m2p(player.getPosition().y));
 		playerSprite.setRotation(player.getAngle()* MathUtils.radDeg - 90);
+		planetSprite.setCenter(Utils.m2p(planet.getPosition().x), Utils.m2p(planet.getPosition().y));
+		planetSprite.setSize(Utils.m2p(((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius() * 2), Utils.m2p(((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius() * 2));
+		planetSprite.draw(batch);
 		playerSprite.draw(batch);
 
 
@@ -162,8 +199,52 @@ public class MindGame extends ApplicationAdapter {
 		world.dispose();
 		b2dr.dispose();
 	}
+
+	private QueryCallback nut = new QueryCallback() {
+		@Override
+		public boolean reportFixture(Fixture fixture) {
+			if (fixture.getBody() == planet) {
+				return false;
+			}
+		Vector2 plan2Deb = new Vector2();
+		plan2Deb.set(fixture.getBody().getPosition().x - planet.getPosition().x, fixture.getBody().getPosition().y-planet.getPosition().y);
+		plan2Deb.scl(-1f);
+
+		float rad = ((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius();
+		float dist = Math.abs(plan2Deb.x) + Math.abs(plan2Deb.y);
+
+		plan2Deb.scl((1f/dist)*rad/plan2Deb.len() * 34);
+		Float flt = new Float(plan2Deb.x);
+		if (flt.isNaN()) {
+			System.out.println(fixture.getBody() == planet);
+		}
+		System.out.println(plan2Deb); //static bodies do not have mass : /
+
+		fixture.getBody().applyForceToCenter(plan2Deb, true);
+
+//System.out.println("what");
+			return true;
+		}
+	};
+
+
 	public void update(float delta) {
 		updateInput();
+
+
+//each planet should have an update method with a query AABB for its shit
+		float x = ((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius();
+
+
+		world.QueryAABB(nut, planet.getPosition().x-(x * 3), planet.getPosition().x-(x * 3), planet.getPosition().x+(x * 3), planet.getPosition().x+(x * 3));
+
+
+
+
+
+
+
+
 		world.step(1/60f, 6, 2);
 		cameraUpdate(); //camera's orthographic x and y world coords in pixels are set to player's coords in pixels
 		//camera.combined.scl(1f/Utils.PPM);
