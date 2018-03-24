@@ -13,6 +13,7 @@ import com.badlogic.gdx.physics.box2d.joints.WeldJoint;
 import com.badlogic.gdx.physics.box2d.joints.WeldJointDef;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ShortArray;
+import com.dookin.states.PlayState;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -164,7 +165,7 @@ public class Asteroid {
     public void separateChunk(Body base) {
         for (int i = 0; i < joints.size; i++) {
             if (joints.get(i).getBodyA().equals(base) || joints.get(i).getBodyB().equals(base)) {
-                MindGame.destroyedJoints.add(joints.get(i));
+                PlayState.destroyedJoints.add(joints.get(i));
                 joints.removeIndex(i);
                 i--;
             }
