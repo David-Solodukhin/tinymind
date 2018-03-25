@@ -9,6 +9,7 @@ import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.Sprite;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
+import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector2;
@@ -49,7 +50,7 @@ public class PlayState extends GameState{
     private Body platform;
     private RayHandler rayHandler;
     private PointLight myLight;
-
+    private ShapeRenderer srend = new ShapeRenderer();
     private MouseJointDef mousejd;
     private MouseJoint mousej;
     public static Array<Joint> destroyedJoints = new Array<Joint>();
@@ -58,8 +59,10 @@ public class PlayState extends GameState{
     private Sprite playerSprite;
     private Sprite planetSprite;
     private Body planet;
+    private Body sun;
     private Matrix4 cmAdjusted = new Matrix4();
     private PointLight planetLight;
+    private Sprite sunSprite;
 
     public PlayState(GameStateManager gsm) {
         super(gsm);
@@ -77,6 +80,7 @@ public class PlayState extends GameState{
         img = new Texture("bg3.jpg");
         playerSprite = new Sprite(new Texture("ship.png"));
         planetSprite = new Sprite(new Texture("planet.png"));
+        sunSprite = new Sprite(new Texture("sun.png"));
         img.setWrap(Texture.TextureWrap.Repeat, Texture.TextureWrap.Repeat);
         camera = new OrthographicCamera();
         camera.setToOrtho(false,Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
@@ -84,13 +88,16 @@ public class PlayState extends GameState{
         gravity = new Vector2(0,0);
         world = new World(gravity, false);
         b2dr = new Box2DDebugRenderer();
-        player = createPlayer(-4,-4);
+        player = createPlayer(0,0);
         //platform  = createPlatform();
-        planet = createPlanet();
+        srend.setAutoShapeType(true);
+        planet = createPlanet(stob2d(new Vector3(0,Gdx.graphics.getHeight(),0)).x,stob2d(new Vector3(0,Gdx.graphics.getHeight(),0)).y ,10f);
+        //createPlanet(stob2d(new Vector3(0,Gdx.graphics.getHeight(),0)).x,stob2d(new Vector3(0,Gdx.graphics.getHeight(),0)).y ,10f);
+        sun = createPlanet(20,20, 6f);
         rayHandler = new RayHandler(world);
         rayHandler.setAmbientLight(.4f);
-        myLight = new PointLight(rayHandler, 100, Color.CYAN, 300/Utils.PPM, 0, 0);
-        planetLight = new PointLight(rayHandler, 100, Color.GRAY, ((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius() * 1.5f, planet.getPosition().x, planet.getPosition().y);
+        myLight = new PointLight(rayHandler, 100, Color.CYAN, 100/Utils.PPM, 0, 0);
+        planetLight = new PointLight(rayHandler, 140, Color.YELLOW, 40f, sun.getPosition().x, sun.getPosition().y);
         planetLight.setXray(true);
         //planetLight.setSoft(true);
         //planetLight.setSoftnessLength(90.0f);
@@ -136,19 +143,19 @@ public class PlayState extends GameState{
 
 
 //each planet should have an update method with a query AABB for its shit
-        float x = ((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius();
+        float r = ((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius();
 
 
-        world.QueryAABB(nut, planet.getPosition().x-(x * 3), planet.getPosition().x-(x * 3), planet.getPosition().x+(x * 3), planet.getPosition().x+(x * 3));
-
-
-
-
+        world.QueryAABB(nut, planet.getPosition().x-(r * 2), planet.getPosition().y-(r * 2), planet.getPosition().x+(r * 2), planet.getPosition().y+(r * 2));
+        System.out.println(planet.getPosition().x-(r * 3) + "hello");
 
 
 
 
-        world.step(1/60f, 6, 2);
+
+
+        world.step(1/60f, 10, 6);
+        //planet.setTransform(0,0, 0);
         cameraUpdate(); //camera's orthographic x and y world coords in pixels are set to player's coords in pixels
         //camera.combined.scl(1f/Utils.PPM);
 
@@ -186,10 +193,19 @@ public class PlayState extends GameState{
         planetSprite.setCenter(Utils.m2p(planet.getPosition().x), Utils.m2p(planet.getPosition().y));
         planetSprite.setSize(Utils.m2p(((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius() * 2), Utils.m2p(((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius() * 2));
         planetSprite.draw(batch);
-        playerSprite.draw(batch);
+        sunSprite.setCenter(Utils.m2p(sun.getPosition().x), Utils.m2p(sun.getPosition().y));
+        sunSprite.setSize(Utils.m2p(((CircleShape)sun.getFixtureList().get(0).getShape()).getRadius() * 2), Utils.m2p(((CircleShape)sun.getFixtureList().get(0).getShape()).getRadius() * 2));
+        sunSprite.draw(batch);
 
 
+        float r = ((CircleShape)planet.getFixtureList().get(0).getShape()).getRadius();
         batch.end();
+
+        srend.setProjectionMatrix(camera.combined);
+        srend.begin();
+
+        srend.rect(Utils.m2p(planet.getPosition().x-(r * 2)), Utils.m2p(planet.getPosition().y-(r * 2)), Utils.m2p(planet.getPosition().x+(r * 2)-(planet.getPosition().x-(r * 2))),Utils.m2p(planet.getPosition().y+(r * 2)-(planet.getPosition().y-(r * 2)) ));
+        srend.end();
 
         b2dr.render(world, camera.combined.scl(Utils.PPM)); //scaled by ppm since camera is in pixels and 1 meter is 32 pixels so meters -> pixels *=32 //camera.combined matrix is scaled by ppm
 
@@ -245,8 +261,9 @@ public class PlayState extends GameState{
         //shape.set(new float[]{0,0,1,0,0.5f,1});
         shape.setAsBox(Utils.p2m(32.0f/2.0f), Utils.p2m(32.0f/2.0f)); //box2d takes height and width from center. so actual width is 16 * 2 = 32
         //STEP 3 ASSIGN FIXTURE TO BODY
-        pBody.createFixture(shape, 3.0f); //the fixture is attached to the shape and gives it a density
-
+        pBody.createFixture(shape, 3.0f);
+        //pBody.getFixtureList().get(0).setRestitution(0); //the fixture is attached to the shape and gives it a density
+        //pBody.getFixtureList().get(0).setFriction(0);
 
         //cleanup
         shape.dispose();
@@ -262,21 +279,30 @@ public class PlayState extends GameState{
         return s.set(Utils.p2m(s.x), Utils.p2m(s.y), 0);
     }
 
-    private Body createPlanet() {
+    private Body createPlanet(float x, float y, float radius) {
         Body pBody;
+        Body dBody;
 
 
         BodyDef def = new BodyDef();
         def.type = BodyDef.BodyType.StaticBody;
         //def.angle = 90 * MathUtils.degRad;
-        def.position.set(0,0);
+        def.position.set(x,y);
         pBody = world.createBody(def);
 
         //PolygonShape shape = new PolygonShape();
         CircleShape shape = new CircleShape();
-        shape.setRadius(10f);
+        shape.setRadius(radius);
         pBody.createFixture(shape, 3.0f);
-        pBody.getFixtureList().get(0).setFriction(0.8f);
+        //pBody.getFixtureList().get(0).setFriction(0);
+        //pBody.getFixtureList().get(0).setRestitution(0);
+
+
+        def.type = BodyDef.BodyType.DynamicBody;
+        dBody = world.createBody(def);
+
+        //PolygonShape shape = new PolygonShape();
+
 
 
         //cleanup
@@ -286,8 +312,8 @@ public class PlayState extends GameState{
     }
     public void cameraUpdate() {
         Vector3 position = camera.position;
-        position.x = player.getPosition().x * Utils.PPM;
-        position.y = player.getPosition().y * Utils.PPM;
+        position.x = Math.round(player.getPosition().x * Utils.PPM);
+        position.y = Math.round(player.getPosition().y * Utils.PPM);
         camera.position.set(position);
         camera.update();
     }
@@ -295,10 +321,11 @@ public class PlayState extends GameState{
         return null;
     }
 
+    private Body dplanet;
     private QueryCallback nut = new QueryCallback() {
         @Override
         public boolean reportFixture(Fixture fixture) {
-            if (fixture.getBody() == planet) {
+            if (fixture.getBody() == planet || fixture.getBody() == dplanet) {
                 return false;
             }
             Vector2 plan2Deb = new Vector2();
@@ -311,11 +338,11 @@ public class PlayState extends GameState{
             plan2Deb.scl((1f/dist)*rad/plan2Deb.len() * 34);
             Float flt = new Float(plan2Deb.x);
             if (flt.isNaN()) {
-                System.out.println(fixture.getBody() == planet);
+                System.out.println(fixture.getBody() == dplanet);
             }
             //System.out.println(plan2Deb); //static bodies do not have mass : /
 
-            fixture.getBody().applyForceToCenter(plan2Deb, true);
+            fixture.getBody().applyForceToCenter(plan2Deb, false);
 
 //System.out.println("what");
             return true;

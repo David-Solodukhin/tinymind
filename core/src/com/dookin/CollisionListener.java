@@ -50,7 +50,9 @@ public class CollisionListener implements ContactListener {
         }
 
 
-
+        //idea: here if normal force from planet(contact force) is < than certain value, turn off the planet gravity force for that object.
+        //in nut callbackquery, if instanceof whatever,(i should really make an all encompassing gameobject class :/) if forcevar is false, no force
+        //make update method for asteroid, if difference in position from planet is > certain noticeable amount, reactivate force for like 2 steps?
 
     }
 

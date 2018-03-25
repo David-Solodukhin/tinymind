@@ -154,7 +154,11 @@ public class Asteroid {
         System.out.println(pos.x + " " + pos.y);
         def.position.set(pos.x, pos.y);
         pBody = world.createBody(def);
+        pBody.setSleepingAllowed(false);
         pBody.createFixture(s, 3.0f);
+       //pBody.getFixtureList().get(0).setFriction(0f);
+        //pBody.getFixtureList().get(0).setRestitution(0);
+        pBody.setBullet(true);
         pBody.setUserData(this);
         return pBody;
     }
